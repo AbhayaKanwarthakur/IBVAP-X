@@ -1,0 +1,33 @@
+{
+  "risk_weights": {
+    "anomaly": 45,
+    "zone": 25,
+    "loitering": 15,
+    "motion": 10,
+    "historical": 5,
+    "suspicious_objects": 35,
+    "restricted_zone_entry": 30,
+    "loitering": 20,
+    "running": 20,
+    "abandoned_object": 35
+  },
+  "anomaly_threshold": 0.65,
+  "behavior_alert_threshold": 0.7,
+  "critical_threshold": 85,
+  "high_threshold": 65,
+  "medium_threshold": 35,
+  "zone": {
+    "x_min": 0.0,
+    "y_min": 0.0,
+    "x_max": 1.0,
+    "y_max": 1.0,
+    "enabled": false
+  },
+  "zone_engine": {
+    "zones": [],
+    "running_speed_px_per_s": 250,
+    "abandoned_object_seconds": 15,
+    "abandoned_object_classes": ["backpack", "handbag", "suitcase"],
+    "person_classes": ["person"]
+  }
+}

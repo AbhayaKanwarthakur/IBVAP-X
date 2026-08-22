@@ -1,0 +1,14 @@
+{
+  "_warning": "All entries are synthetic demo personas enrolled with consent. Never store real identification or criminal data here.",
+  "personas": [
+    {
+      "persona_id": "SUBJECT-014",
+      "display_label": "Demo Subject 014",
+      "consented_by": "Alex (teammate, verbal consent for demo, 2026-08-20)",
+      "fictional_case_note": "Fictional: flagged in mock incident #22 for hackathon demo purposes only. No real event occurred.",
+      "embedding": [0.0123, -0.045, "... 512-d vector truncated for example ..."],
+      "enrolled_at": 1755600000.0,
+      "synthetic": true
+    }
+  ]
+}

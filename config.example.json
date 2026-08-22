@@ -1,0 +1,32 @@
+{
+  "_comment": "Merge this into your existing ai/config.json — only the zone_engine key is new.",
+
+  "zone_engine": {
+    "zones": [
+      {
+        "name": "restricted_dock",
+        "polygon": [[100, 100], [400, 100], [400, 400], [100, 400]],
+        "rule": "restricted"
+      },
+      {
+        "name": "lobby",
+        "polygon": [[0, 0], [640, 0], [640, 480], [0, 480]],
+        "rule": "loiter",
+        "loiter_seconds": 10,
+        "loiter_max_displacement_px": 50
+      }
+    ],
+    "running_speed_px_per_s": 250,
+    "abandoned_object_seconds": 15,
+    "abandoned_object_classes": ["backpack", "handbag", "suitcase"],
+    "person_classes": ["person"]
+  },
+
+  "risk_weights": {
+    "_comment": "Extend your existing risk weights with the new signal types",
+    "restricted_zone_entry": 0.35,
+    "loitering": 0.2,
+    "running": 0.15,
+    "abandoned_object": 0.3
+  }
+}
