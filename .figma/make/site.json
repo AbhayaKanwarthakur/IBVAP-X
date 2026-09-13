@@ -1,5 +1,6 @@
 {
-  "description": "This web application offers users a visually stunning platform to create and customize beautiful designs, enhancing their projects with tailored themes.",
+  "title": "IBVAP-X",
+  "description": "IBVAP-X border intelligence and live camera analysis dashboard.",
   "robots": {
     "index": false
   },

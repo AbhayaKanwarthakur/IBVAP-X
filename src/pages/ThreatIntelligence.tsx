@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { incidents } from '../data/mockData';
+import { useEffect, useState } from 'react';
+import { apiUrl } from '../api/client';
 
 function ThreatGauge({ score }: { score: number }) {
   const color = score >= 80 ? '#ef4444' : score >= 60 ? '#f97316' : score >= 40 ? '#f59e0b' : '#22c55e';
@@ -41,8 +41,26 @@ function ThreatGauge({ score }: { score: number }) {
 
 export default function ThreatIntelligence() {
   const [selectedFactor, setSelectedFactor] = useState<number | null>(null);
-  const [score, setScore] = useState(91);
-  const incident = incidents[0];
+  const [incident, setIncident] = useState<any>(null);
+  const [score, setScore] = useState(0);
+
+  useEffect(() => {
+    fetch(apiUrl('/api/threat-intelligence'), { cache: 'no-store' }).then(response => response.json()).then(payload => {
+      const data = payload.data || {};
+      const factors = Array.isArray(data.factors) && data.factors.length ? data.factors : [{ label: 'Watchlist candidate', score: 25, reason: 'Possible human match identified by the live camera pipeline.' }];
+      setIncident({
+        id: data.activeThreat?.id || 'LIVE-THREAT',
+        type: data.activeThreat?.type || 'Candidate face review',
+        camera: data.activeThreat?.camera || 'WEBCAM',
+        risk: Number(data.score || data.activeThreat?.risk || 0),
+        riskFactors: factors,
+        disclaimer: data.disclaimer || 'Supervisor confirmation is required before any action.'
+      });
+      setScore(Number(data.score || data.activeThreat?.risk || 0));
+    }).catch(() => {})
+  }, [])
+
+  if (!incident) return <div className="p-5 font-mono text-slate-500">NO LIVE THREAT EVENTS AVAILABLE</div>
 
   return (
     <div className="p-5 space-y-5 fade-in">

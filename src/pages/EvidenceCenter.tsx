@@ -1,14 +1,44 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Download, Eye, Play, FileText, Filter } from 'lucide-react';
-import { incidents } from '../data/mockData';
+import { apiUrl } from '../api/client';
 
 export default function EvidenceCenter() {
   const [view, setView] = useState<'grid' | 'report'>('grid');
-  const [reportInc, setReportInc] = useState(incidents[0]);
+  const [evidence, setEvidence] = useState<any[]>([]);
+  const [reportInc, setReportInc] = useState<any>(null);
   const [filterSev, setFilterSev] = useState('ALL');
   const [exporting, setExporting] = useState(false);
 
-  const filtered = incidents.filter(i => filterSev === 'ALL' || i.severity === filterSev);
+  useEffect(() => {
+    const load = async () => {
+      const response = await fetch(apiUrl('/api/evidence'), { cache: 'no-store' })
+      if (response.ok) setEvidence((await response.json()).data || [])
+    }
+    void load()
+    const timer = window.setInterval(() => void load(), 3000)
+    return () => window.clearInterval(timer)
+  }, [])
+
+  const records = evidence.map(item => ({
+    id: item.id,
+    severity: item.severity || 'LOW',
+    type: item.behaviorSignals?.[0]?.type || 'AI event',
+    cam: item.cameraId,
+    sector: item.cameraId,
+    track: item.trackIds?.[0] == null ? 'UNTRACKED' : `TRACK-${item.trackIds[0]}`,
+    risk: item.riskScore || 0,
+    time: item.capturedAt ? new Date(item.capturedAt).toLocaleTimeString('en-IN', { hour12: false }) : '--:--:--',
+    status: 'OPEN',
+    description: item.disclaimer,
+    evidence: { frames: 1, clips: 0 },
+    riskFactors: Object.entries(item.signals || {}).map(([label, value]) => ({ label, score: Number(value) || 0, reason: 'AI signal contributing to the event.' })),
+    frameUrl: apiUrl(item.frameUrl),
+  }))
+  const filtered = records.filter(i => filterSev === 'ALL' || i.severity === filterSev);
+
+  useEffect(() => {
+    if (!reportInc && records[0]) setReportInc(records[0])
+  }, [records, reportInc])
 
   const handleExport = () => {
     setExporting(true);
@@ -20,7 +50,7 @@ export default function EvidenceCenter() {
       <div className="flex items-end justify-between">
         <div>
           <div className="font-rajdhani font-700 tracking-widest" style={{ fontSize: 20, color: '#e2e8f0', letterSpacing: '0.12em' }}>EVIDENCE CENTER</div>
-          <div className="font-mono text-xs" style={{ color: '#475569' }}>{incidents.length} incidents · {incidents.reduce((s, i) => s + i.evidence.frames + i.evidence.clips, 0)} evidence items</div>
+          <div className="font-mono text-xs" style={{ color: '#475569' }}>{records.length} evidence events · {records.length} captured frames</div>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex gap-1" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: 3 }}>
@@ -47,7 +77,7 @@ export default function EvidenceCenter() {
             <div key={inc.id} style={{ background: 'rgba(13,17,23,0.9)', border: `1px solid ${inc.severity === 'CRITICAL' ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.07)'}`, borderRadius: 8, overflow: 'hidden' }}>
               {/* Thumbnail */}
               <div style={{ background: '#040608', aspectRatio: '16/7', position: 'relative', overflow: 'hidden' }}>
-                <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at 40% 40%, #001510 0%, #040608 80%)' }} />
+                <img src={inc.frameUrl} alt="Captured AI event frame" className="absolute inset-0 h-full w-full object-contain" />
                 {/* Detection box */}
                 <div style={{ position: 'absolute', left: '38%', top: '20%', width: '15%', height: '50%', border: `1.5px solid ${inc.severity === 'CRITICAL' ? '#ef4444' : '#f59e0b'}` }}>
                   <div style={{ position: 'absolute', top: -18, left: 0, background: 'rgba(239,68,68,0.2)', borderRadius: 3, padding: '1px 5px', fontFamily: 'JetBrains Mono', fontSize: 8, color: '#ef4444', whiteSpace: 'nowrap' }}>
@@ -180,7 +210,7 @@ export default function EvidenceCenter() {
             <div style={{ background: 'rgba(13,17,23,0.9)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 8, padding: 16 }}>
               <div className="section-header">SELECT INCIDENT</div>
               <div className="space-y-1">
-                {incidents.map(i => (
+                {records.map(i => (
                   <button key={i.id} onClick={() => setReportInc(i)} className="w-full text-left rounded" style={{
                     background: reportInc.id === i.id ? 'rgba(0,212,255,0.08)' : 'none',
                     border: reportInc.id === i.id ? '1px solid rgba(0,212,255,0.2)' : '1px solid transparent',

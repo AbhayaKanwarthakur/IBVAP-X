@@ -1,11 +1,23 @@
 import { useState, useEffect } from 'react';
 import {
-  Camera, User, ChevronRight, Zap, Shield, Wifi, ScanLine
+  Activity, BarChart3, Camera, ChevronRight, FileSearch, Map, MonitorCog, Network, PenTool,
+  Radar, ScanLine, Shield, Siren, User, Video, Wifi, Zap,
 } from 'lucide-react';
 
 const navItems = [
+  { id: 'command', label: 'Command Center', icon: MonitorCog },
   { id: 'surveillance', label: 'Live Surveillance', icon: Camera },
   { id: 'plates', label: 'License Plates', icon: ScanLine },
+  { id: 'analysis', label: 'Video Analysis', icon: Video },
+  { id: 'incidents', label: 'Incidents', icon: Siren },
+  { id: 'threat', label: 'Threat Intelligence', icon: Radar },
+  { id: 'tracking', label: 'Entity Tracking', icon: Network },
+  { id: 'map', label: 'Sector Map', icon: Map },
+  { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+  { id: 'evidence', label: 'Evidence Center', icon: FileSearch },
+  { id: 'health', label: 'System Health', icon: Activity },
+  { id: 'zones', label: 'Zone Editor', icon: PenTool },
+  { id: 'settings', label: 'Settings', icon: MonitorCog },
 ];
 
 interface LayoutProps {
@@ -113,7 +125,7 @@ export default function Layout({ page, setPage, children }: LayoutProps) {
             <span className="font-mono" style={{ color: '#334155', fontSize: 8, letterSpacing: '0.12em' }}>BORDER INTELLIGENCE SYSTEM</span>
           </div>
 
-          <div className="flex-1 font-mono" style={{ color: '#64748b', fontSize: 10, letterSpacing: '0.08em' }}>SINGLE SOURCE · PHONE CAMERA</div>
+          <div className="flex-1 font-mono" style={{ color: '#64748b', fontSize: 10, letterSpacing: '0.08em' }}>SINGLE SOURCE · WEBCAM</div>
 
           {/* Status pills */}
           <div className="hidden lg:flex items-center gap-3">

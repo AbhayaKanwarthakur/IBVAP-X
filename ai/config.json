@@ -1,18 +1,26 @@
 {
   "risk_weights": {
-    "anomaly": 45,
-    "zone": 25,
-    "loitering": 15,
-    "motion": 10,
-    "historical": 5,
-    "suspicious_objects": 35,
-    "restricted_zone_entry": 30,
+    "anomaly": 40,
+    "zone": 20,
     "loitering": 20,
-    "running": 20,
-    "abandoned_object": 35
+    "motion": 8,
+    "historical": 5,
+    "suspicious_objects": 60,
+    "weapon_detected": 90,
+    "synthetic_persona_match": 45,
+    "restricted_zone_entry": 35,
+    "repeated_zone_reentry": 50,
+    "running": 18,
+    "abandoned_object": 35,
+    "activity_anomaly_rtfm": 40,
+    "pacing": 25,
+    "perimeter_hugging": 30,
+    "sudden_stop": 20,
+    "crowd_formation": 30
   },
-  "anomaly_threshold": 0.65,
+  "anomaly_threshold": 0.60,
   "behavior_alert_threshold": 0.7,
+  "weapon_classes": ["knife", "scissors"],
   "critical_threshold": 85,
   "high_threshold": 65,
   "medium_threshold": 35,
@@ -25,9 +33,17 @@
   },
   "zone_engine": {
     "zones": [],
-    "running_speed_px_per_s": 250,
+    "running_speed_px_per_s": 220,
     "abandoned_object_seconds": 15,
     "abandoned_object_classes": ["backpack", "handbag", "suitcase"],
-    "person_classes": ["person"]
+    "person_classes": ["person"],
+    "crowd_threshold": 4,
+    "crowd_radius": 0.15
+  },
+  "rtfm": {
+    "warmup_frames": 20,
+    "z_threshold": 2.5,
+    "min_spike_frames": 8,
+    "group_min_tracks": 2
   }
 }

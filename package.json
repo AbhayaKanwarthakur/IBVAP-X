@@ -1,5 +1,5 @@
 {
-  "name": "figma-make-app",
+  "name": "ibvap-x",
   "private": true,
   "version": "1.0.0",
   "type": "module",
@@ -8,6 +8,7 @@
     "server": "node server/index.mjs",
     "dev:full": "concurrently \"npm run server\" \"npm run dev\"",
     "test:api": "node --check server/index.mjs",
+    "test:smoke": "node tests/api-smoke.mjs",
     "build": "vite build",
     "preview": "vite preview",
     "format": "oxfmt"
@@ -17,7 +18,8 @@
     "lucide-react": "^1.33.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "recharts": "^3.10.1"
+    "recharts": "^3.10.1",
+    "ws": "^8.21.3"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.0.0",

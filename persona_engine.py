@@ -74,9 +74,14 @@ class EmbeddingModel:
 
 
 class PersonaEngine:
-    def __init__(self, store_path: str = "personas.json", match_threshold: float = 0.75):
+    REFERENCE_GROUPS = {
+        "PERSON-1": {"persona_id": "PERSON-1", "label": "PERSON 1 (T1-T3)", "angle": "T1-T3"},
+        "PERSON-2": {"persona_id": "PERSON-2", "label": "PERSON 2 (H1-H4)", "angle": "H1-H4"},
+    }
+
+    def __init__(self, store_path: str = "personas.json", match_threshold: float | None = None):
         self.store_path = store_path
-        self.match_threshold = match_threshold
+        self.match_threshold = match_threshold if match_threshold is not None else float(os.getenv("PERSONA_MATCH_THRESHOLD", "0.7"))
         self.personas: Dict[str, Persona] = {}
         self._load()
 
@@ -144,11 +149,18 @@ class PersonaEngine:
             return None
 
         persona = self.personas[best_id]
+        group = self.REFERENCE_GROUPS.get(persona.persona_id, {
+            "persona_id": persona.persona_id,
+            "label": persona.display_label,
+            "angle": persona.persona_id,
+        })
         return {
             "matched": True,
             "synthetic": True,  # always present — UI must gate display on this
-            "persona_id": persona.persona_id,
-            "display_label": f"[DEMO/SYNTHETIC] {persona.display_label}",
+            "persona_id": group["persona_id"],
+            "display_label": f"[DEMO/SYNTHETIC] {group['label']}",
+            "profile_label": group["label"],
+            "reference_angle": group["angle"],
             "similarity": round(float(best_sim), 3),
             "fictional_case_note": persona.fictional_case_note,
             "disclaimer": "This is a synthetic demo match against a consenting "

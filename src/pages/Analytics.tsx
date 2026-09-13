@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
-  AreaChart, Area, LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, ResponsiveContainer, Tooltip, Legend
+  AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
+  XAxis, YAxis, ResponsiveContainer, Tooltip
 } from 'recharts';
-import { analyticsData } from '../data/mockData';
+import { apiUrl } from '../api/client';
 
 const TT = ({ contentStyle, labelStyle, itemStyle }: any) => null;
 const tooltipStyle = {
@@ -13,6 +13,31 @@ const tooltipStyle = {
 
 export default function Analytics() {
   const [period, setPeriod] = useState('24H');
+  const [analyticsData, setAnalyticsData] = useState<any>({
+    incidentsOverTime: [],
+    threatDistribution: [],
+    incidentsBySector: [],
+    objectDetections: [],
+    riskScores: [],
+    topIncidentTypes: [],
+    cameraActivity: [],
+    summary: {},
+  });
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const response = await fetch(apiUrl('/api/analytics'), { cache: 'no-store' });
+        if (response.ok) {
+          const payload = await response.json();
+          setAnalyticsData(payload.data || analyticsData);
+        }
+      } catch {}
+    };
+    void load();
+    const timer = window.setInterval(() => void load(), 5000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   return (
     <div className="p-5 space-y-5 fade-in">

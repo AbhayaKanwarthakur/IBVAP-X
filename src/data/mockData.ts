@@ -1,5 +1,5 @@
 export const cameras = [
-  { id: 'CAM-PHONE', sector: 'MOBILE FIELD UNIT', status: 'offline', fps: 0, latency: 0, resolution: '1080p', uptime: 0, location: { x: 50, y: 50 }, streamUrl: '', protocol: 'browser-camera' },
+  { id: 'WEBCAM', sector: 'LOCAL WEBCAM', status: 'offline', fps: 0, latency: 0, resolution: '1080p', uptime: 0, location: { x: 50, y: 50 }, streamUrl: '', protocol: 'browser-camera' },
 ];
 
 export const persons = [

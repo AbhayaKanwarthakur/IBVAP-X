@@ -8,6 +8,8 @@ from typing import Any
 class ContextEngine:
     def __init__(self, config: dict[str, Any]) -> None:
         self.zone = config.get("zone", {})
+        self.weapon_classes: set[str] = set(config.get("weapon_classes", ["knife", "scissors"]))
+        self.suspicious_classes: set[str] = self.weapon_classes | {"backpack", "handbag", "suitcase"}
 
     def evaluate(self, detections: list[dict[str, Any]], track_history: Any, width: int, height: int) -> dict[str, float]:
         people = [item for item in detections if item.get("label") == "person"]
@@ -21,12 +23,20 @@ class ContextEngine:
                     break
         loitering = max((track_history.loitering_score(item.get("track_id")) for item in people), default=0.0)
         motion = min(1.0, len(people) / 5.0)
-        suspicious_labels = {"knife", "license_plate"}
-        suspicious_objects = min(1.0, sum(item.get("label") in suspicious_labels for item in detections) / 2.0)
+        # Weapons score 1.0 immediately; other suspicious objects scale with count
+        weapon_count = sum(1 for d in detections if d.get("label") in self.weapon_classes)
+        other_suspicious = sum(1 for d in detections if d.get("label") in self.suspicious_classes and d.get("label") not in self.weapon_classes)
+        suspicious_objects = 1.0 if weapon_count > 0 else min(1.0, other_suspicious / 3.0)
         return {"zone": zone_risk, "loitering": loitering, "motion": motion, "historical": 0.0, "suspicious_objects": suspicious_objects}
 
 
 class RiskEngine:
+    HIGH_RISK_BEHAVIORS = {
+        "running", "possible_fighting", "weapon_detected", "stabbing",
+        "gun_firing", "firearm_detected", "restricted_zone_entry",
+        "repeated_zone_reentry", "synthetic_persona_match",
+    }
+
     def __init__(self, config_path: str = "ai/config.json") -> None:
         config_file = Path(config_path)
         if not config_file.is_absolute():
@@ -68,5 +78,13 @@ class RiskEngine:
             severity = "MEDIUM"
         else:
             severity = "LOW"
-        alert_behavior = any(signal.get("severity", 0) >= self.config.get("behavior_alert_threshold", 0.7) for signal in behavior_signals)
-        return {"risk_score": risk_score, "severity": severity, "signals": values, "contributions": contributions, "alert": alert_behavior or values.get("anomaly", 0.0) >= self.config["anomaly_threshold"] or severity in {"HIGH", "CRITICAL"}}
+        high_risk_signal = any(signal.get("type") in self.HIGH_RISK_BEHAVIORS and signal.get("severity", 0) >= 0.6 for signal in behavior_signals)
+        if not high_risk_signal:
+            risk_score = min(risk_score, 25)
+            severity = "LOW"
+        alert_behavior = any(signal.get("type") in self.HIGH_RISK_BEHAVIORS and signal.get("severity", 0) >= self.config.get("behavior_alert_threshold", 0.7) for signal in behavior_signals)
+        return {"risk_score": risk_score, "severity": severity, "signals": values, "contributions": contributions, "alert": alert_behavior}
+
+    def score_track(self, track_id: int, anomaly_score: float, context: dict[str, float], behavior_signals: list[dict[str, Any]]) -> dict[str, Any]:
+        track_signals = [signal for signal in behavior_signals if signal.get("track_id") in (track_id, None)]
+        return self.score(anomaly_score, context, track_signals)

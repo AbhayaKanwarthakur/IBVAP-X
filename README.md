@@ -53,14 +53,14 @@ Risk scores are normalized to 0–100 from the active weighted signals. Context 
 
 Optional synthetic persona matching is available only when `PERSONA_MATCHING_ENABLED=true`. It compares tracked person crops against explicitly consented demo profiles in `personas.json`; it does not identify criminals or provide crime records. Install `facenet-pytorch`, enroll a consenting demo subject with `python enroll_persona.py`, and use only fictional case notes.
 
-Risk weights and thresholds are in `ai/config.json`. Set `YOLO_MODEL`, `YOLO_CLASSES`, and `AI_DEVICE` to configure model loading. `YOLO_MODEL` defaults to `yolov8m.pt`; live inference defaults to people, bicycles, cars, motorcycles, buses, trucks, backpacks, handbags, suitcases, and knives. The included `plate_model.pt` is loaded automatically for license-plate boxes; set `PLATE_MODEL` to replace it with another compatible weight. Plate character reading still requires an OCR engine. The service reports the plate model state as `loaded`, `not_configured`, or an error in `/health` and each frame result.
+Risk weights and thresholds are in `ai/config.json`. Set `YOLO_MODEL`, `YOLO_CLASSES`, and `AI_DEVICE` to configure model loading. `YOLO_MODEL` defaults to `yolo11n.pt`; live inference defaults to people, bicycles, cars, motorcycles, buses, trucks, backpacks, handbags, suitcases, and knives. The included `plate_model.pt` is loaded automatically for license-plate boxes; set `PLATE_MODEL` to replace it with another compatible weight. Plate character reading still requires an OCR engine. The service reports the plate model state as `loaded`, `not_configured`, or an error in `/health` and each frame result.
 
 ## Prerecorded video test
 
 Install the Python dependencies, start the AI service, and send a local video through the same frame endpoint:
 
 ```powershell
-\.venv\Scripts\python ai\test_video.py .\video\sample.mp4
+\.venv\Scripts\python ai\test_video.py path\to\sample.mp4
 ```
 
 This test mode is deliberately separate from the phone camera and uses the same YOLO, ByteTrack, temporal, context, zone behavior, persona, and risk code paths.

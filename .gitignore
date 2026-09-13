@@ -28,3 +28,5 @@ server/data/uploads/
 # beside it.
 /.plugins/
 /.opencode-skills/
+
+.vercel

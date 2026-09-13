@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import base64
 import json
+import uuid
 from pathlib import Path
 
 import cv2
@@ -13,8 +14,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Send a prerecorded video through the IBVAP-X AI service")
     parser.add_argument("video", type=Path)
     parser.add_argument("--api", default="http://localhost:9000")
-    parser.add_argument("--every", type=int, default=3, help="Process every Nth frame")
+    parser.add_argument("--every", type=int, default=1, help="Process every Nth frame")
     args = parser.parse_args()
+    session_id = f"upload-{uuid.uuid4()}"
     capture = cv2.VideoCapture(str(args.video))
     if not capture.isOpened():
         raise SystemExit(f"Could not open video: {args.video}")
@@ -29,7 +31,7 @@ def main() -> None:
         ok, encoded = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
         if not ok:
             continue
-        payload = {"camera_id": "RECORDED-TEST", "image_base64": base64.b64encode(encoded).decode("ascii")}
+        payload = {"camera_id": "RECORDED-TEST", "session_id": session_id, "image_base64": base64.b64encode(encoded).decode("ascii")}
         result = requests.post(f"{args.api}/infer/frame", json=payload, timeout=30)
         result.raise_for_status()
         print(json.dumps({"frame": frame_number, **result.json()}), flush=True)

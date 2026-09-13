@@ -5,12 +5,12 @@
     "zones": [
       {
         "name": "restricted_dock",
-        "polygon": [[100, 100], [400, 100], [400, 400], [100, 400]],
+        "polygon": [[0.15, 0.2], [0.6, 0.2], [0.6, 0.8], [0.15, 0.8]],
         "rule": "restricted"
       },
       {
         "name": "lobby",
-        "polygon": [[0, 0], [640, 0], [640, 480], [0, 480]],
+        "polygon": [[0, 0], [1, 0], [1, 1], [0, 1]],
         "rule": "loiter",
         "loiter_seconds": 10,
         "loiter_max_displacement_px": 50

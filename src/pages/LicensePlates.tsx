@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { apiUrl } from '../api/client'
 import { Download, RefreshCw } from 'lucide-react'
 
 type LiceplateRecord = { id: string; name: 'liceplate'; plate: string; confidence: number; cameraId: string; location: string; sensitive: boolean; recordedAt: string }
@@ -10,7 +11,7 @@ export default function LicensePlates() {
   const [filter, setFilter] = useState<Filter>('all')
 
   const loadRecords = async () => {
-    const response = await fetch('/api/liceplates', { cache: 'no-store' })
+    const response = await fetch(apiUrl('/api/liceplates'), { cache: 'no-store' })
     if (response.ok) setRecords((await response.json()).data as LiceplateRecord[])
   }
 
@@ -57,8 +58,8 @@ export default function LicensePlates() {
 
       <section className="glass overflow-x-auto" style={{ borderRadius: 10 }}>
         <table className="w-full text-left">
-          <thead><tr className="border-b border-white/10"><th className="p-3 font-mono text-[10px] text-slate-500">PLATE NUMBER</th><th className="p-3 font-mono text-[10px] text-slate-500">DATE / TIME</th><th className="p-3 font-mono text-[10px] text-slate-500">LOCATION</th><th className="p-3 font-mono text-[10px] text-slate-500">CONFIDENCE</th><th className="p-3 font-mono text-[10px] text-slate-500">FIELD</th></tr></thead>
-          <tbody>{visibleRecords.map((record) => <tr key={record.id} className="border-b border-white/5"><td className="p-3 font-mono text-sm text-amber-300">{record.plate}</td><td className="p-3 font-mono text-[11px] text-slate-300">{new Date(record.recordedAt).toLocaleString()}</td><td className="p-3 font-mono text-[11px] text-slate-300">{record.location}</td><td className="p-3 font-mono text-[11px] text-slate-300">{Math.round(record.confidence * 100)}%</td><td className="p-3 font-mono text-[10px]" style={{ color: record.sensitive ? '#ef4444' : '#22c55e' }}>{record.sensitive ? 'SENSITIVE' : 'NORMAL'}</td></tr>)}</tbody>
+          <thead><tr className="border-b border-white/10"><th className="p-3 font-mono text-[10px] text-slate-500">PLATE NUMBER</th><th className="p-3 font-mono text-[10px] text-slate-500">DATE / TIME</th><th className="p-3 font-mono text-[10px] text-slate-500">LOCATION</th><th className="p-3 font-mono text-[10px] text-slate-500">CONFIDENCE</th><th className="p-3 font-mono text-[10px] text-slate-500">FIELD</th><th className="p-3 font-mono text-[10px] text-slate-500">STATUS</th></tr></thead>
+          <tbody>{visibleRecords.map((record) => <tr key={record.id} className="border-b border-white/5"><td className="p-3 font-mono text-sm text-amber-300">{record.plate}</td><td className="p-3 font-mono text-[11px] text-slate-300">{new Date(record.recordedAt).toLocaleString()}</td><td className="p-3 font-mono text-[11px] text-slate-300">{record.location}</td><td className="p-3 font-mono text-[11px] text-slate-300">{Math.round(record.confidence * 100)}%</td><td className="p-3 font-mono text-[10px]" style={{ color: record.sensitive ? '#ef4444' : '#22c55e' }}>{record.sensitive ? 'SENSITIVE' : 'NORMAL'}</td><td className="p-3 font-mono text-[10px]" style={{ color: (record as any).authorized ? '#22c55e' : '#f59e0b' }}>{(record as any).authorized ? 'AUTHORIZED' : 'UNKNOWN'}</td></tr>)}</tbody>
         </table>
         {visibleRecords.length === 0 && <div className="p-8 text-center font-mono text-[11px] text-slate-500">No validated license plate records.</div>}
       </section>

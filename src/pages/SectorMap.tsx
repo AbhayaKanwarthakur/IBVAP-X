@@ -1,11 +1,41 @@
-import { useState } from 'react';
-import { cameras, sectors, restrictedZones, incidents, persons } from '../data/mockData';
+import { useEffect, useState } from 'react';
+import { apiUrl } from '../api/client';
 
 export default function SectorMap() {
   const [selectedCam, setSelectedCam] = useState<string | null>(null);
   const [selectedSector, setSelectedSector] = useState<string | null>(null);
+  const [cameras, setCameras] = useState<any[]>([]);
+  const [incidents, setIncidents] = useState<any[]>([]);
+  const [persons, setPersons] = useState<any[]>([]);
+  const [criminals, setCriminals] = useState<any[]>([]);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [camerasResponse, incidentsResponse, trackingResponse, criminalsResponse] = await Promise.all([
+          fetch(apiUrl('/api/cameras'), { cache: 'no-store' }),
+          fetch(apiUrl('/api/incidents'), { cache: 'no-store' }),
+          fetch(apiUrl('/api/entity-tracking'), { cache: 'no-store' }),
+          fetch(apiUrl('/api/criminals'), { cache: 'no-store' }),
+        ]);
+        if (camerasResponse.ok) setCameras((await camerasResponse.json()).data || []);
+        if (incidentsResponse.ok) setIncidents((await incidentsResponse.json()).data || []);
+        if (trackingResponse.ok) setPersons(((await trackingResponse.json()).data?.persons || []).slice(0, 10));
+        if (criminalsResponse.ok) setCriminals((await criminalsResponse.json()).data || []);
+      } catch {}
+    };
+    void load();
+    const timer = window.setInterval(() => void load(), 5000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const cam = cameras.find(c => c.id === selectedCam);
+  const sectors = [
+    { id: 'SEC-A', name: 'NORTH GATE', threatLevel: 'HIGH', cameras: cameras.filter(c => c.sector?.includes('NORTH') || c.id.includes('CAM-04')).map(c => c.id), incidents: incidents.filter(i => i.cam === 'CAM-04').length, color: '#f97316' },
+    { id: 'SEC-B', name: 'EAST CORRIDOR', threatLevel: 'HIGH', cameras: cameras.filter(c => c.sector?.includes('EAST') || c.id.includes('CAM-02')).map(c => c.id), incidents: incidents.filter(i => i.cam === 'CAM-02').length, color: '#ef4444' },
+    { id: 'SEC-C', name: 'SOUTH GATE', threatLevel: 'MEDIUM', cameras: cameras.filter(c => c.sector?.includes('SOUTH') || c.id.includes('CAM-06')).map(c => c.id), incidents: incidents.filter(i => i.cam === 'CAM-06').length, color: '#f59e0b' },
+    { id: 'SEC-D', name: 'WEST ACCESS', threatLevel: 'LOW', cameras: cameras.filter(c => c.sector?.includes('WEST') || c.id.includes('CAM-08')).map(c => c.id), incidents: incidents.filter(i => i.cam === 'CAM-08').length, color: '#22c55e' },
+  ];
 
   return (
     <div className="p-5 space-y-5 fade-in">
@@ -61,10 +91,12 @@ export default function SectorMap() {
                 <line x1={0} y1={32} x2={100} y2={32} stroke="rgba(255,255,255,0.04)" strokeWidth={0.5} />
 
                 {/* Camera positions */}
-                {cameras.map(c => (
+                {cameras.map(c => {
+                  const position = c.location || { x: 50, y: 50 };
+                  return (
                   <g key={c.id} onClick={() => setSelectedCam(selectedCam === c.id ? null : c.id)} style={{ cursor: 'pointer' }}>
                     <circle
-                      cx={c.location.x} cy={c.location.y} r={1.5}
+                      cx={position.x} cy={position.y} r={1.5}
                       fill={c.status === 'offline' ? '#ef4444' : c.status === 'warning' ? '#f59e0b' : '#00d4ff'}
                       opacity={0.9}
                     />
@@ -75,9 +107,9 @@ export default function SectorMap() {
                       stroke={c.status === 'offline' ? 'rgba(239,68,68,0.2)' : 'rgba(0,212,255,0.15)'}
                       strokeWidth={0.2}
                     />
-                    <text x={c.location.x + 2} y={c.location.y - 2} fontFamily="JetBrains Mono" fontSize={1.4} fill={selectedCam === c.id ? '#00d4ff' : 'rgba(255,255,255,0.4)'}>{c.id}</text>
+                    <text x={position.x + 2} y={position.y - 2} fontFamily="JetBrains Mono" fontSize={1.4} fill={selectedCam === c.id ? '#00d4ff' : 'rgba(255,255,255,0.4)'}>{c.id}</text>
                   </g>
-                ))}
+                )})}
 
                 {/* Person positions */}
                 {persons.map(p => (
@@ -102,7 +134,7 @@ export default function SectorMap() {
               {/* Selected cam popup */}
               {selectedCam && cam && (
                 <div style={{
-                  position: 'absolute', top: `${cam.location.y + 2}%`, left: `${cam.location.x + 2}%`,
+                  position: 'absolute', top: `${(cam.location?.y || 50) + 2}%`, left: `${(cam.location?.x || 50) + 2}%`,
                   background: 'rgba(9,12,17,0.95)', border: '1px solid rgba(0,212,255,0.3)', borderRadius: 6, padding: 10, minWidth: 160, zIndex: 10,
                 }}>
                   <div className="font-rajdhani font-700 text-xs" style={{ color: '#00d4ff', letterSpacing: '0.08em' }}>{cam.id}</div>
@@ -144,9 +176,15 @@ export default function SectorMap() {
               <div key={inc.id} className="mb-2 rounded-lg" style={{ background: 'rgba(239,68,68,0.04)', border: '1px solid rgba(239,68,68,0.15)', padding: '10px 12px' }}>
                 <div className="flex items-center justify-between">
                   <span className="font-mono text-xs font-700" style={{ color: '#e2e8f0', fontSize: 11 }}>{inc.id}</span>
-                  <span className={`badge-${inc.severity.toLowerCase()}`}>{inc.severity}</span>
+                  <span className={`badge-${String(inc.severity || 'medium').toLowerCase()}`}>{inc.severity || 'MEDIUM'}</span>
                 </div>
-                <div className="font-mono mt-1" style={{ color: '#475569', fontSize: 9 }}>{inc.cam} · {inc.sector}</div>
+                <div className="font-mono mt-1" style={{ color: '#475569', fontSize: 9 }}>{inc.cam || 'WEBCAM'} · {inc.sector || 'ACTIVE ZONE'}</div>
+              </div>
+            ))}
+            {criminals.length > 0 && criminals.slice(0, 3).map(criminal => (
+              <div key={criminal.id} className="mb-2 rounded-lg" style={{ background: 'rgba(14,116,144,0.05)', border: '1px solid rgba(34,211,238,0.15)', padding: '10px 12px' }}>
+                <div className="font-mono text-xs font-700" style={{ color: '#e2e8f0', fontSize: 11 }}>{criminal.name}</div>
+                <div className="font-mono mt-1" style={{ color: '#475569', fontSize: 9 }}>{criminal.crime} · {criminal.lastKnownLocation}</div>
               </div>
             ))}
           </div>

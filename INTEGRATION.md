@@ -16,11 +16,10 @@ define camera-specific polygons under `zone_engine.zones` in `ai/config.json`.
 
 ## Coordinate space note
 
-`zone_engine.py` expects zone polygons and bboxes in the same pixel space.
-If you resize frames before YOLO inference, define zones in the *resized*
-resolution (e.g. the same size you feed to `model.predict()`), not the
-original camera resolution — otherwise restricted-zone checks will be
-offset.
+`zone_engine.py` receives pixel bboxes from the detector and normalizes their
+centers to `0..1` before polygon checks. Define zone polygon points in the
+normalized `0..1` coordinate space, as produced by the Zone Editor. This keeps
+zones stable when camera resolution or detector resize settings change.
 
 ## What this does NOT do
 

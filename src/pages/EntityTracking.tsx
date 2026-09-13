@@ -1,12 +1,90 @@
-import { useState } from 'react';
-import { persons, vehicles } from '../data/mockData';
+import { useEffect, useState } from 'react';
+import { apiUrl } from '../api/client';
 
 type Tab = 'persons' | 'vehicles' | 'anpr' | 'crowd';
 
+type PersonRecord = {
+  id: string;
+  type: string;
+  appearance: string;
+  movement: string;
+  loitering: number;
+  sector: string;
+  risk: number;
+  status: string;
+  faceAvailable: boolean;
+  cam: string;
+  x: number;
+  y: number;
+};
+
+type VehicleRecord = {
+  id: string;
+  plate: string;
+  confidence: number;
+  cam: string;
+  time: string;
+  status: string;
+  type: string;
+  color: string;
+  distance: number;
+  duration: string;
+};
+
 export default function EntityTracking() {
   const [tab, setTab] = useState<Tab>('persons');
-  const [selectedPerson, setSelectedPerson] = useState(persons[0]);
-  const [selectedVehicle, setSelectedVehicle] = useState(vehicles[0]);
+  const [persons, setPersons] = useState<PersonRecord[]>([]);
+  const [vehicles, setVehicles] = useState<VehicleRecord[]>([]);
+  const [criminals, setCriminals] = useState<any[]>([]);
+  const [candidates, setCandidates] = useState<any[]>([]);
+  const [reviewBusy, setReviewBusy] = useState<string | null>(null);
+  const [selectedPerson, setSelectedPerson] = useState<PersonRecord | null>(null);
+  const [selectedVehicle, setSelectedVehicle] = useState<VehicleRecord | null>(null);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [trackingResponse, criminalResponse] = await Promise.all([
+          fetch(apiUrl('/api/entity-tracking'), { cache: 'no-store' }),
+          fetch(apiUrl('/api/criminals'), { cache: 'no-store' }),
+        ]);
+        if (trackingResponse.ok) {
+          const payload = await trackingResponse.json();
+          const livePersons = payload.data?.persons || [];
+          const liveVehicles = payload.data?.vehicles || [];
+          setPersons(livePersons);
+          setVehicles(liveVehicles);
+          setCandidates(payload.data?.faceCandidates || []);
+          setSelectedPerson((current) => current || livePersons[0] || null);
+          setSelectedVehicle((current) => current || liveVehicles[0] || null);
+        }
+        if (criminalResponse.ok) {
+          const payload = await criminalResponse.json();
+          setCriminals(payload.data || []);
+        }
+      } catch {}
+    };
+    void load();
+    const timer = window.setInterval(() => void load(), 5000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const reviewCandidate = async (candidateId: string, status: 'confirmed' | 'rejected') => {
+    setReviewBusy(candidateId);
+    try {
+      const response = await fetch(apiUrl(`/api/criminals/candidates/${candidateId}`), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'X-Operator-Id': 'supervisor' },
+        body: JSON.stringify({ status }),
+      });
+      if (response.ok) {
+        const payload = await response.json();
+        setCandidates(current => current.map(candidate => candidate.id === candidateId ? payload.data : candidate));
+      }
+    } finally {
+      setReviewBusy(null);
+    }
+  };
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'persons', label: 'PERSON TRACKING' },
@@ -16,10 +94,46 @@ export default function EntityTracking() {
   ];
 
   return (
-    <div className="p-5 space-y-5 fade-in">
+    <div className="entity-page p-7 space-y-7 fade-in">
       <div>
         <div className="font-rajdhani font-700 tracking-widest" style={{ fontSize: 20, color: '#e2e8f0', letterSpacing: '0.12em' }}>ENTITY TRACKING</div>
         <div className="font-mono text-xs" style={{ color: '#475569' }}>Person · Vehicle · ANPR · Crowd Intelligence</div>
+      </div>
+
+      <div className="review-queue">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="section-header">SUPERVISOR REVIEW QUEUE</div>
+            <div className="font-mono mt-1" style={{ color: '#64748b', fontSize: 11 }}>Face captures are candidates only. Confirm or reject before escalation.</div>
+          </div>
+          <div className="review-count">{candidates.filter(candidate => candidate.status === 'candidate').length} PENDING</div>
+        </div>
+        {candidates.length === 0 ? (
+          <div className="review-empty">No face candidates have been captured from the live camera yet.</div>
+        ) : (
+          <div className="review-grid">
+            {candidates.slice(0, 4).map(candidate => (
+              <div key={candidate.id} className={`review-card ${candidate.status}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="font-rajdhani font-700 text-base" style={{ color: '#e2e8f0' }}>{candidate.criminalName}</div>
+                    <div className="font-mono mt-1" style={{ color: '#64748b', fontSize: 10 }}>{candidate.cameraId} · {candidate.location}</div>
+                  </div>
+                  <span className={`review-status ${candidate.status}`}>{candidate.status}</span>
+                </div>
+                <div className="review-metrics">
+                  <span>SIMILARITY <strong>{Math.round(Number(candidate.similarity || 0) * 100)}%</strong></span>
+                  <span>LAST SEEN <strong>{new Date(candidate.lastSeen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</strong></span>
+                </div>
+                <div className="font-mono" style={{ color: '#94a3b8', fontSize: 10 }}>{candidate.crime} · {candidate.height} · {candidate.weight}</div>
+                {candidate.status === 'candidate' && <div className="flex gap-2 mt-4">
+                  <button className="btn-primary flex-1" disabled={reviewBusy === candidate.id} onClick={() => void reviewCandidate(candidate.id, 'confirmed')}>CONFIRM MATCH</button>
+                  <button className="btn-ghost flex-1" disabled={reviewBusy === candidate.id} onClick={() => void reviewCandidate(candidate.id, 'rejected')}>REJECT</button>
+                </div>}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Tabs */}
@@ -43,11 +157,12 @@ export default function EntityTracking() {
           <div style={{ background: 'rgba(13,17,23,0.9)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 8, padding: 16 }}>
             <div className="section-header">TRACKED PERSONS</div>
             <div className="space-y-2">
+              {persons.length === 0 && <div className="font-mono text-xs" style={{ color: '#475569' }}>No live persons detected.</div>}
               {persons.map(p => (
                 <button key={p.id} onClick={() => setSelectedPerson(p)} className="w-full text-left rounded-lg"
                   style={{
-                    background: selectedPerson.id === p.id ? 'rgba(0,212,255,0.08)' : 'rgba(255,255,255,0.02)',
-                    border: `1px solid ${selectedPerson.id === p.id ? 'rgba(0,212,255,0.25)' : 'rgba(255,255,255,0.06)'}`,
+                    background: selectedPerson?.id === p.id ? 'rgba(0,212,255,0.08)' : 'rgba(255,255,255,0.02)',
+                    border: `1px solid ${selectedPerson?.id === p.id ? 'rgba(0,212,255,0.25)' : 'rgba(255,255,255,0.06)'}`,
                     padding: '10px 12px', cursor: 'pointer',
                   }}>
                   <div className="flex items-center justify-between mb-1">
@@ -62,109 +177,113 @@ export default function EntityTracking() {
 
           {/* Person detail */}
           <div className="space-y-4">
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-              {/* Profile */}
-              <div style={{ background: 'rgba(13,17,23,0.9)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 8, padding: 20 }}>
-                <div className="section-header">ENTITY PROFILE</div>
-                <div className="flex items-center gap-4 mb-4">
-                  <div style={{ width: 60, height: 60, borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {selectedPerson.faceAvailable ? (
-                      <div style={{ width: 50, height: 50, borderRadius: 6, background: 'rgba(0,212,255,0.08)' }} />
-                    ) : (
-                      <div className="text-center">
-                        <div style={{ fontSize: 18 }}>❓</div>
-                        <div className="font-mono" style={{ color: '#475569', fontSize: 8 }}>N/A</div>
+            {selectedPerson && (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  {/* Profile */}
+                  <div style={{ background: 'rgba(13,17,23,0.9)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 8, padding: 20 }}>
+                    <div className="section-header">ENTITY PROFILE</div>
+                    <div className="flex items-center gap-4 mb-4">
+                      <div style={{ width: 60, height: 60, borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {selectedPerson.faceAvailable ? (
+                          <div style={{ width: 50, height: 50, borderRadius: 6, background: 'rgba(0,212,255,0.08)' }} />
+                        ) : (
+                          <div className="text-center">
+                            <div style={{ fontSize: 18 }}>❓</div>
+                            <div className="font-mono" style={{ color: '#475569', fontSize: 8 }}>N/A</div>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                  <div>
-                    <div className="font-rajdhani font-700 text-sm" style={{ color: '#e2e8f0', letterSpacing: '0.08em' }}>{selectedPerson.id}</div>
-                    <div className="font-mono text-xs" style={{ color: '#475569', fontSize: 10 }}>
-                      {selectedPerson.faceAvailable ? 'FACE AVAILABLE' : 'FACE NOT AVAILABLE'}
-                    </div>
-                    <span className={`badge-${selectedPerson.status.toLowerCase()}`} style={{ marginTop: 4, display: 'inline-block' }}>{selectedPerson.status}</span>
-                  </div>
-                </div>
-                {[
-                  { label: 'TYPE', value: selectedPerson.type },
-                  { label: 'APPEARANCE', value: selectedPerson.appearance },
-                  { label: 'MOVEMENT', value: selectedPerson.movement },
-                  { label: 'LOITERING', value: `${selectedPerson.loitering} seconds` },
-                  { label: 'LOCATION', value: selectedPerson.sector },
-                  { label: 'RISK SCORE', value: `${selectedPerson.risk}/100` },
-                  { label: 'CAMERA', value: selectedPerson.cam },
-                ].map(m => (
-                  <div key={m.label} className="flex justify-between py-1.5" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                    <span className="font-mono text-xs" style={{ color: '#475569', fontSize: 10, letterSpacing: '0.06em' }}>{m.label}</span>
-                    <span className="font-mono text-xs" style={{ color: m.label === 'RISK SCORE' && selectedPerson.risk > 70 ? '#ef4444' : '#94a3b8', fontSize: 10 }}>{m.value}</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Face Occlusion */}
-              <div style={{ background: 'rgba(13,17,23,0.9)', border: '1px solid rgba(0,212,255,0.12)', borderRadius: 8, padding: 20 }}>
-                <div className="section-header">RE-ID STATUS</div>
-                {!selectedPerson.faceAvailable ? (
-                  <>
-                    <div style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 6, padding: 12, marginBottom: 16 }}>
-                      <div className="flex items-center gap-2">
-                        <span className="status-dot-offline blink" style={{ width: 7, height: 7, borderRadius: '50%', display: 'inline-block' }} />
-                        <span className="font-rajdhani font-700 text-xs" style={{ color: '#ef4444', letterSpacing: '0.1em' }}>FACE OCCLUDED</span>
+                      <div>
+                        <div className="font-rajdhani font-700 text-sm" style={{ color: '#e2e8f0', letterSpacing: '0.08em' }}>{selectedPerson.id}</div>
+                        <div className="font-mono text-xs" style={{ color: '#475569', fontSize: 10 }}>
+                          {selectedPerson.faceAvailable ? 'FACE AVAILABLE' : 'FACE NOT AVAILABLE'}
+                        </div>
+                        <span className={`badge-${selectedPerson.status.toLowerCase()}`} style={{ marginTop: 4, display: 'inline-block' }}>{selectedPerson.status}</span>
                       </div>
                     </div>
                     {[
-                      { label: 'Appearance Similarity', v: 87 },
-                      { label: 'Trajectory Consistency', v: 94, text: 'HIGH' },
-                      { label: 'Cross-Camera Continuity', v: 89 },
+                      { label: 'TYPE', value: selectedPerson.type },
+                      { label: 'APPEARANCE', value: selectedPerson.appearance },
+                      { label: 'MOVEMENT', value: selectedPerson.movement },
+                      { label: 'LOITERING', value: `${selectedPerson.loitering} seconds` },
+                      { label: 'LOCATION', value: selectedPerson.sector },
+                      { label: 'RISK SCORE', value: `${selectedPerson.risk}/100` },
+                      { label: 'CAMERA', value: selectedPerson.cam },
                     ].map(m => (
-                      <div key={m.label} className="mb-3">
-                        <div className="flex justify-between mb-1">
-                          <span className="font-mono text-xs" style={{ color: '#64748b', fontSize: 10 }}>{m.label}</span>
-                          <span className="font-mono text-xs" style={{ color: '#00d4ff', fontSize: 10 }}>{m.text || `${m.v}%`}</span>
-                        </div>
-                        <div style={{ height: 3, background: 'rgba(255,255,255,0.06)', borderRadius: 2 }}>
-                          <div style={{ width: `${m.v}%`, height: '100%', background: '#00d4ff', borderRadius: 2 }} />
-                        </div>
+                      <div key={m.label} className="flex justify-between py-1.5" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                        <span className="font-mono text-xs" style={{ color: '#475569', fontSize: 10, letterSpacing: '0.06em' }}>{m.label}</span>
+                        <span className="font-mono text-xs" style={{ color: m.label === 'RISK SCORE' && selectedPerson.risk > 70 ? '#ef4444' : '#94a3b8', fontSize: 10 }}>{m.value}</span>
                       </div>
                     ))}
-                    <div className="text-center mt-4 p-3 rounded" style={{ background: 'rgba(0,212,255,0.05)', border: '1px solid rgba(0,212,255,0.15)' }}>
-                      <div className="font-rajdhani font-700 text-xs" style={{ color: '#00d4ff', letterSpacing: '0.08em' }}>FACE-INDEPENDENT TRACKING ACTIVE</div>
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex items-center justify-center h-40">
-                    <div className="text-center">
-                      <div style={{ fontSize: 28, marginBottom: 8 }}>✓</div>
-                      <div className="font-rajdhani font-700 text-xs" style={{ color: '#22c55e', letterSpacing: '0.1em' }}>FACE DETECTED</div>
-                      <div className="font-mono text-xs mt-1" style={{ color: '#475569', fontSize: 10 }}>Standard facial tracking active</div>
-                    </div>
                   </div>
-                )}
-              </div>
-            </div>
 
-            {/* Multi-camera trail */}
-            <div style={{ background: 'rgba(13,17,23,0.9)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 8, padding: 20 }}>
-              <div className="section-header">MULTI-CAMERA TRACKING TRAIL</div>
-              <div className="flex items-start gap-0">
-                {['CAM-01', 'CAM-04', 'CAM-07', 'CAM-09'].map((c, i) => (
-                  <div key={c} className="flex-1 flex flex-col items-center">
-                    <div style={{ width: 40, height: 40, borderRadius: 8, background: i === 1 ? 'rgba(239,68,68,0.12)' : 'rgba(0,212,255,0.08)', border: `1px solid ${i === 1 ? 'rgba(239,68,68,0.3)' : 'rgba(0,212,255,0.2)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <span className="font-mono" style={{ fontSize: 9, color: i === 1 ? '#ef4444' : '#00d4ff' }}>📹</span>
-                    </div>
-                    <div className="font-rajdhani font-700 text-xs mt-2 text-center" style={{ color: '#94a3b8' }}>{c}</div>
-                    <div className="font-mono text-center" style={{ color: '#334155', fontSize: 9 }}>Match {89 - i * 2}%</div>
-                    <div className="font-mono text-center" style={{ color: '#475569', fontSize: 9 }}>0{i}:{10 + i * 4}:00</div>
-                    {i < 3 && (
-                      <div style={{ position: 'relative', width: '100%', height: 2, background: 'rgba(0,212,255,0.2)', marginTop: -26, zIndex: -1 }} />
+                  {/* Face Occlusion */}
+                  <div style={{ background: 'rgba(13,17,23,0.9)', border: '1px solid rgba(0,212,255,0.12)', borderRadius: 8, padding: 20 }}>
+                    <div className="section-header">RE-ID STATUS</div>
+                    {!selectedPerson.faceAvailable ? (
+                      <>
+                        <div style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 6, padding: 12, marginBottom: 16 }}>
+                          <div className="flex items-center gap-2">
+                            <span className="status-dot-offline blink" style={{ width: 7, height: 7, borderRadius: '50%', display: 'inline-block' }} />
+                            <span className="font-rajdhani font-700 text-xs" style={{ color: '#ef4444', letterSpacing: '0.1em' }}>FACE OCCLUDED</span>
+                          </div>
+                        </div>
+                        {[
+                          { label: 'Appearance Similarity', v: 87 },
+                          { label: 'Trajectory Consistency', v: 94, text: 'HIGH' },
+                          { label: 'Cross-Camera Continuity', v: 89 },
+                        ].map(m => (
+                          <div key={m.label} className="mb-3">
+                            <div className="flex justify-between mb-1">
+                              <span className="font-mono text-xs" style={{ color: '#64748b', fontSize: 10 }}>{m.label}</span>
+                              <span className="font-mono text-xs" style={{ color: '#00d4ff', fontSize: 10 }}>{m.text || `${m.v}%`}</span>
+                            </div>
+                            <div style={{ height: 3, background: 'rgba(255,255,255,0.06)', borderRadius: 2 }}>
+                              <div style={{ width: `${m.v}%`, height: '100%', background: '#00d4ff', borderRadius: 2 }} />
+                            </div>
+                          </div>
+                        ))}
+                        <div className="text-center mt-4 p-3 rounded" style={{ background: 'rgba(0,212,255,0.05)', border: '1px solid rgba(0,212,255,0.15)' }}>
+                          <div className="font-rajdhani font-700 text-xs" style={{ color: '#00d4ff', letterSpacing: '0.08em' }}>FACE-INDEPENDENT TRACKING ACTIVE</div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex items-center justify-center h-40">
+                        <div className="text-center">
+                          <div style={{ fontSize: 28, marginBottom: 8 }}>✓</div>
+                          <div className="font-rajdhani font-700 text-xs" style={{ color: '#22c55e', letterSpacing: '0.1em' }}>FACE DETECTED</div>
+                          <div className="font-mono text-xs mt-1" style={{ color: '#475569', fontSize: 10 }}>Standard facial tracking active</div>
+                        </div>
+                      </div>
                     )}
                   </div>
-                ))}
-              </div>
-              <div className="mt-4 p-3 rounded text-center" style={{ background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.2)' }}>
-                <div className="font-mono text-xs" style={{ color: '#f59e0b', fontSize: 10 }}>POSSIBLE SAME ENTITY · Appearance Match 89% · Temporal Consistency HIGH · NOT CONFIRMED IDENTITY</div>
-              </div>
-            </div>
+                </div>
+
+                {/* Multi-camera trail */}
+                <div style={{ background: 'rgba(13,17,23,0.9)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 8, padding: 20 }}>
+                  <div className="section-header">MULTI-CAMERA TRACKING TRAIL</div>
+                  <div className="flex items-start gap-0">
+                    {['CAM-01', 'CAM-04', 'CAM-07', 'CAM-09'].map((c, i) => (
+                      <div key={c} className="flex-1 flex flex-col items-center">
+                        <div style={{ width: 40, height: 40, borderRadius: 8, background: i === 1 ? 'rgba(239,68,68,0.12)' : 'rgba(0,212,255,0.08)', border: `1px solid ${i === 1 ? 'rgba(239,68,68,0.3)' : 'rgba(0,212,255,0.2)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <span className="font-mono" style={{ fontSize: 9, color: i === 1 ? '#ef4444' : '#00d4ff' }}>📹</span>
+                        </div>
+                        <div className="font-rajdhani font-700 text-xs mt-2 text-center" style={{ color: '#94a3b8' }}>{c}</div>
+                        <div className="font-mono text-center" style={{ color: '#334155', fontSize: 9 }}>Match {89 - i * 2}%</div>
+                        <div className="font-mono text-center" style={{ color: '#475569', fontSize: 9 }}>0{i}:{10 + i * 4}:00</div>
+                        {i < 3 && (
+                          <div style={{ position: 'relative', width: '100%', height: 2, background: 'rgba(0,212,255,0.2)', marginTop: -26, zIndex: -1 }} />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-4 p-3 rounded text-center" style={{ background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.2)' }}>
+                    <div className="font-mono text-xs" style={{ color: '#f59e0b', fontSize: 10 }}>POSSIBLE SAME ENTITY · Appearance Match 89% · Temporal Consistency HIGH · NOT CONFIRMED IDENTITY</div>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -178,8 +297,8 @@ export default function EntityTracking() {
               {vehicles.map(v => (
                 <button key={v.id} onClick={() => setSelectedVehicle(v)} className="w-full text-left rounded-lg"
                   style={{
-                    background: selectedVehicle.id === v.id ? 'rgba(0,212,255,0.08)' : 'rgba(255,255,255,0.02)',
-                    border: `1px solid ${selectedVehicle.id === v.id ? 'rgba(0,212,255,0.25)' : 'rgba(255,255,255,0.06)'}`,
+                    background: selectedVehicle?.id === v.id ? 'rgba(0,212,255,0.08)' : 'rgba(255,255,255,0.02)',
+                    border: `1px solid ${selectedVehicle?.id === v.id ? 'rgba(0,212,255,0.25)' : 'rgba(255,255,255,0.06)'}`,
                     padding: '10px 12px', cursor: 'pointer',
                   }}>
                   <div className="flex items-center justify-between mb-1">
@@ -191,7 +310,7 @@ export default function EntityTracking() {
               ))}
             </div>
           </div>
-          <div style={{ background: 'rgba(13,17,23,0.9)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 8, padding: 20 }}>
+          {selectedVehicle && <div style={{ background: 'rgba(13,17,23,0.9)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 8, padding: 20 }}>
             <div className="section-header">VEHICLE PROFILE · {selectedVehicle.id}</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
               <div>
@@ -225,7 +344,7 @@ export default function EntityTracking() {
                 ))}
               </div>
             </div>
-          </div>
+          </div>}
         </div>
       )}
 

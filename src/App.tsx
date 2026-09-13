@@ -14,7 +14,9 @@ const EvidenceCenter = lazy(() => import('./pages/EvidenceCenter'));
 const SystemHealth = lazy(() => import('./pages/SystemHealth'));
 const Settings = lazy(() => import('./pages/Settings'));
 
-type Page = 'command' | 'surveillance' | 'plates' | 'analysis' | 'incidents' | 'threat' | 'tracking' | 'map' | 'analytics' | 'evidence' | 'health' | 'settings';
+const ZoneEditor = lazy(() => import('./pages/ZoneEditor'));
+
+type Page = 'command' | 'surveillance' | 'plates' | 'analysis' | 'incidents' | 'threat' | 'tracking' | 'map' | 'analytics' | 'evidence' | 'health' | 'settings' | 'zones';
 
 class AppErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
   state = { hasError: false };
@@ -47,7 +49,6 @@ export default function App() {
   const [page, setPage] = useState<Page>('surveillance');
   const pages: Record<Page, React.ReactNode> = {
     command: <CommandCenter />,
-    surveillance: <LiveSurveillance />,
     plates: <LicensePlates />,
     analysis: <VideoAnalysis />,
     incidents: <Incidents />,
@@ -57,6 +58,7 @@ export default function App() {
     analytics: <Analytics />,
     evidence: <EvidenceCenter />,
     health: <SystemHealth />,
+    zones: <ZoneEditor />,
     settings: <Settings />,
   };
 
@@ -69,7 +71,10 @@ export default function App() {
               <div className="font-mono" style={{ color: '#00d4ff', fontSize: 11, letterSpacing: '0.12em' }}>LOADING VIEW...</div>
             </div>
           }>
-            {pages[page]}
+            <div className={page === 'surveillance' ? 'h-full' : 'absolute -z-10 h-px w-px overflow-hidden opacity-0 pointer-events-none'}>
+              <LiveSurveillance />
+            </div>
+            {page !== 'surveillance' && pages[page]}
           </Suspense>
         </Layout>
       </AppErrorBoundary>

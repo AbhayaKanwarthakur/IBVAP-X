@@ -21,15 +21,15 @@ class YoloByteTrackDetector:
 
     def __init__(self) -> None:
         project_root = Path(__file__).resolve().parents[2]
-        configured_model = os.getenv("YOLO_MODEL", "yolov8m.pt")
+        configured_model = os.getenv("YOLO_MODEL", "yolo11n.pt")
         self.model_name = str(Path(configured_model) if Path(configured_model).is_absolute() else project_root / configured_model)
         self.model = YOLO(self.model_name)
         self.device = os.getenv("AI_DEVICE", "0" if os.getenv("CUDA_VISIBLE_DEVICES") else "cpu")
-        self.image_size = int(os.getenv("YOLO_IMAGE_SIZE", "640"))
-        self.plate_image_size = int(os.getenv("PLATE_IMAGE_SIZE", "960"))
-        self.confidence = float(os.getenv("YOLO_CONFIDENCE", "0.30"))
+        self.image_size = int(os.getenv("YOLO_IMAGE_SIZE", "480"))
+        self.plate_image_size = int(os.getenv("PLATE_IMAGE_SIZE", "640"))
+        self.confidence = float(os.getenv("YOLO_CONFIDENCE", "0.45"))
         self.plate_confidence = float(os.getenv("PLATE_CONFIDENCE", "0.35"))
-        self.target_classes = [int(value) for value in os.getenv("YOLO_CLASSES", "0,1,2,3,5,7,24,26,28,43").split(",") if value.strip()]
+        self.target_classes = [int(value) for value in os.getenv("YOLO_CLASSES", "0,1,2,3,5,7,24,26,28,43,76").split(",") if value.strip()]
         configured_plate_model = os.getenv("PLATE_MODEL", "plate_model.pt")
         plate_path = Path(configured_plate_model)
         self.plate_model_name = str(plate_path if plate_path.is_absolute() else project_root / plate_path)

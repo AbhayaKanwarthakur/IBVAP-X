@@ -1,11 +1,14 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AlertTriangle, Clock, Camera, ChevronRight, ArrowUpDown, Play, Download, FileText, X } from 'lucide-react';
-import { incidents, alerts } from '../data/mockData';
+import { apiUrl } from '../api/client';
 
 type Severity = 'ALL' | 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
 type SortKey = 'severity' | 'time' | 'camera' | 'risk';
 
 const severityOrder: Record<string, number> = { CRITICAL: 4, HIGH: 3, MEDIUM: 2, LOW: 1 };
+type IncidentRecord = {
+  id: string; severity: string; type: string; cam: string; sector: string; track: string; risk: number; time: string; status: string; description: string; evidence: { frames: number; clips: number }; riskFactors: Array<{ label: string; score: number; reason: string }>;
+};
 
 function RiskGauge({ score }: { score: number }) {
   const color = score >= 80 ? '#ef4444' : score >= 60 ? '#f97316' : score >= 40 ? '#f59e0b' : '#22c55e';
@@ -31,7 +34,7 @@ function RiskGauge({ score }: { score: number }) {
   );
 }
 
-function IncidentModal({ incident, onClose }: { incident: typeof incidents[0]; onClose: () => void }) {
+function IncidentModal({ incident, onClose }: { incident: IncidentRecord; onClose: () => void }) {
   const [selectedFactor, setSelectedFactor] = useState<number | null>(null);
   const steps = ['10s Before', 'Detection', 'Intrusion', '10s After'];
   const [timelineStep, setTimelineStep] = useState(2);
@@ -165,9 +168,31 @@ function IncidentModal({ incident, onClose }: { incident: typeof incidents[0]; o
 export default function Incidents() {
   const [filter, setFilter] = useState<Severity>('ALL');
   const [sort, setSort] = useState<SortKey>('severity');
-  const [selected, setSelected] = useState<typeof incidents[0] | null>(null);
+  const [incidentList, setIncidentList] = useState<IncidentRecord[]>([]);
+  const [selected, setSelected] = useState<IncidentRecord | null>(null);
 
-  const filtered = incidents
+  useEffect(() => {
+    fetch(apiUrl('/api/incidents')).then(response => response.json()).then(payload => {
+      if (!Array.isArray(payload.data) || payload.data.length === 0) return
+      const liveIncidents = payload.data.map((incident: any): IncidentRecord => ({
+        id: incident.id,
+        severity: incident.severity || 'LOW',
+        type: incident.type || 'Unusual Activity',
+        cam: incident.camera_id || incident.cam || 'UNKNOWN',
+        sector: incident.sector || incident.location || 'UNKNOWN SECTOR',
+        track: incident.detections?.[0]?.track_id ? `TRACK-${incident.detections[0].track_id}` : incident.track || 'UNTRACKED',
+        risk: Number(incident.risk_score || incident.risk || 0),
+        time: incident.createdAt ? new Date(incident.createdAt).toLocaleTimeString('en-IN', { hour12: false }) : incident.time || '--:--:--',
+        status: incident.status || 'OPEN',
+        description: incident.description || incident.context?.detail || 'AI-generated incident requiring operator review.',
+        evidence: { frames: 0, clips: 0 },
+        riskFactors: Object.entries(incident.signals || {}).map(([label, value]) => ({ label, score: Number(value) || 0, reason: 'Signal reported by the AI risk engine.' })),
+      }))
+      setIncidentList(liveIncidents)
+    }).catch(() => {})
+  }, [])
+
+  const filtered = incidentList
     .filter(i => filter === 'ALL' || i.severity === filter)
     .sort((a, b) => {
       if (sort === 'severity') return severityOrder[b.severity] - severityOrder[a.severity];
@@ -183,7 +208,7 @@ export default function Incidents() {
       <div className="flex items-end justify-between">
         <div>
           <div className="font-rajdhani font-700 tracking-widest" style={{ fontSize: 20, color: '#e2e8f0', letterSpacing: '0.12em' }}>INCIDENT ALERT CENTER</div>
-          <div className="font-mono text-xs" style={{ color: '#475569' }}>{incidents.length} total incidents · {incidents.filter(i => i.status === 'OPEN').length} open</div>
+          <div className="font-mono text-xs" style={{ color: '#475569' }}>{incidentList.length} total incidents · {incidentList.filter(i => i.status === 'OPEN').length} open</div>
         </div>
         <div className="flex items-center gap-3">
           {/* Severity filter */}
