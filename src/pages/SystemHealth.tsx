@@ -66,9 +66,14 @@ export default function SystemHealth() {
 
       {/* Service status */}
       <div style={{ background: 'rgba(13,17,23,0.9)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 8, padding: 20 }}>
-        <div className="section-header">SERVICE STATUS</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
-          {[{ name: 'NODE API', status: health?.status === 'ok' ? 'online' : 'offline', version: health?.version || '--' }, { name: 'AI SERVICE', status: aiHealth?.status === 'ok' ? 'online' : 'offline', version: aiHealth?.service || '--' }, { name: 'CAMERA NETWORK', status: cameras.some(c => c.status === 'online') ? 'online' : 'warning', version: `${cameras.length} configured` }].map(s => (
+        <div className="section-header">SERVICE & PIPELINE STATUS</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 16 }}>
+          {[
+            { name: 'NODE API', status: health?.status === 'ok' ? 'online' : 'offline', version: health?.version || '--' },
+            { name: 'AI SERVICE', status: aiHealth?.status === 'ok' ? 'online' : 'offline', version: aiHealth?.service || '--' },
+            { name: 'CAMERA NETWORK', status: cameras.some(c => c.status === 'online') ? 'online' : 'warning', version: `${cameras.length} configured` },
+            { name: 'BYTETRACK TRACKER', status: aiHealth?.models?.bytetrack ? 'online' : 'warning', version: 'ByteTrack v1.0' },
+          ].map(s => (
             <div key={s.name} style={{ background: s.status === 'online' ? 'rgba(34,197,94,0.04)' : 'rgba(245,158,11,0.04)', border: `1px solid ${s.status === 'online' ? 'rgba(34,197,94,0.15)' : 'rgba(245,158,11,0.25)'}`, borderRadius: 7, padding: 14 }}>
               <div className="flex items-center gap-2 mb-2">
                 <span className={`status-dot-${s.status === 'online' ? 'online' : 'warning'} ${s.status === 'online' ? 'blink' : ''}`} style={{ width: 7, height: 7, borderRadius: '50%', display: 'inline-block' }} />
@@ -76,6 +81,26 @@ export default function SystemHealth() {
               </div>
               <div className="font-rajdhani font-700 text-xs" style={{ color: '#e2e8f0', letterSpacing: '0.06em' }}>{s.name}</div>
               <div className="font-mono" style={{ color: '#334155', fontSize: 9 }}>{s.version}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* AI Engine Sub-Models */}
+        <div className="font-mono text-xs mb-2" style={{ color: '#00d4ff', fontSize: 10, letterSpacing: '0.1em' }}>COMPUTER VISION & MODEL PIPELINE</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+          {[
+            { name: 'YOLO OBJECT DETECTOR', status: aiHealth?.models?.yolo ? 'online' : 'offline', detail: aiHealth?.models?.yolo ? String(aiHealth.models.yolo).split('\\').pop()?.split('/').pop() : 'not_loaded' },
+            { name: 'PLATE DETECTOR', status: aiHealth?.models?.plate === 'loaded' ? 'online' : 'warning', detail: aiHealth?.models?.plate || 'not_configured' },
+            { name: 'OCR ENGINE', status: aiHealth?.models?.ocr?.includes('loaded') ? 'online' : 'warning', detail: aiHealth?.models?.ocr || 'not_installed' },
+            { name: 'RTFM ANOMALY', status: aiHealth?.models?.rtfm === 'loaded' ? 'online' : 'warning', detail: aiHealth?.models?.rtfm || 'disabled' },
+          ].map(m => (
+            <div key={m.name} style={{ background: m.status === 'online' ? 'rgba(0,212,255,0.04)' : 'rgba(245,158,11,0.04)', border: `1px solid ${m.status === 'online' ? 'rgba(0,212,255,0.2)' : 'rgba(245,158,11,0.25)'}`, borderRadius: 7, padding: 12 }}>
+              <div className="flex items-center gap-2 mb-1.5">
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: m.status === 'online' ? '#00d4ff' : '#f59e0b', display: 'inline-block' }} />
+                <span className="font-mono text-xs" style={{ color: m.status === 'online' ? '#00d4ff' : '#f59e0b', fontSize: 9, letterSpacing: '0.08em' }}>{m.status.toUpperCase()}</span>
+              </div>
+              <div className="font-rajdhani font-700 text-xs" style={{ color: '#e2e8f0', letterSpacing: '0.05em' }}>{m.name}</div>
+              <div className="font-mono truncate" style={{ color: '#64748b', fontSize: 9 }} title={m.detail}>{m.detail}</div>
             </div>
           ))}
         </div>

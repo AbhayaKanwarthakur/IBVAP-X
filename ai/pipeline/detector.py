@@ -11,6 +11,11 @@ import cv2
 from ultralytics import YOLO
 
 try:
+    import easyocr
+except ImportError:
+    easyocr = None
+
+try:
     import pytesseract
 except ImportError:
     pytesseract = None
@@ -36,6 +41,8 @@ class YoloByteTrackDetector:
         self.plate_model: YOLO | None = None
         self.plate_status = "not_configured"
         self.ocr_status = "not_installed"
+        self.easyocr_reader: easyocr.Reader | None = None
+
         if self.plate_model_name:
             if not Path(self.plate_model_name).exists():
                 self.plate_status = f"missing:{self.plate_model_name}"
@@ -45,15 +52,24 @@ class YoloByteTrackDetector:
                     self.plate_status = "loaded"
                 except Exception as error:
                     self.plate_status = f"load_error:{error}"
+
         if self.plate_model is None:
             self.ocr_status = "not_configured"
-        elif pytesseract is None:
-            self.ocr_status = "not_installed"
         else:
-            executable = shutil.which("tesseract") or r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-            if Path(executable).exists():
-                pytesseract.pytesseract.tesseract_cmd = executable
-                self.ocr_status = "loaded"
+            if easyocr is not None:
+                try:
+                    use_gpu = self.device != "cpu" and self.device != "-1"
+                    self.easyocr_reader = easyocr.Reader(["en"], gpu=use_gpu, verbose=False)
+                    self.ocr_status = "easyocr_loaded"
+                except Exception as error:
+                    print(f"[OCR] EasyOCR initialization notice: {error}", flush=True)
+                    self.easyocr_reader = None
+
+            if self.easyocr_reader is None and pytesseract is not None:
+                executable = shutil.which("tesseract") or r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+                if Path(executable).exists():
+                    pytesseract.pytesseract.tesseract_cmd = executable
+                    self.ocr_status = "tesseract_loaded"
 
     def infer(self, frame: np.ndarray) -> list[dict[str, Any]]:
         result = self.model.track(
@@ -73,21 +89,44 @@ class YoloByteTrackDetector:
             plate_result = self.plate_model.predict(frame, device=self.device, imgsz=self.plate_image_size, conf=self.plate_confidence, verbose=False)[0]
             plate_detections = self._format_detections(plate_result, tracked=False, label_override="license_plate")
             for detection in plate_detections:
-                if self.ocr_status == "loaded":
+                plate_text = None
+                if self.ocr_status in ("easyocr_loaded", "tesseract_loaded"):
                     try:
                         x1, y1, x2, y2 = detection["box"]
                         crop = frame[max(0, y1):max(y1 + 1, y2), max(0, x1):max(x1 + 1, x2)]
                         if crop.size:
-                            enlarged = cv2.resize(crop, None, fx=3, fy=3, interpolation=cv2.INTER_CUBIC)
-                            gray = cv2.cvtColor(enlarged, cv2.COLOR_BGR2GRAY)
-                            thresholded = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
-                            reading = pytesseract.image_to_string(thresholded, config="--psm 7 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
-                            plate_text = re.sub(r"[^A-Z0-9]", "", reading.upper())
-                            # Accept common registration shapes, not arbitrary OCR text.
-                            valid_shape = re.fullmatch(r"[A-Z]{2}[0-9]{1,2}[A-Z]{1,3}[0-9]{1,4}", plate_text or "")
-                            detection["plate_text"] = plate_text if valid_shape else None
+                            enlarged = cv2.resize(crop, None, fx=3, opacity=1, fy=3, interpolation=cv2.INTER_CUBIC) if False else cv2.resize(crop, None, fx=3, fy=3, interpolation=cv2.INTER_CUBIC)
+                            
+                            # Primary OCR: EasyOCR
+                            if self.easyocr_reader is not None:
+                                try:
+                                    results = self.easyocr_reader.readtext(enlarged, detail=0)
+                                    combined = "".join(results)
+                                    raw_text = re.sub(r"[^A-Z0-9]", "", combined.upper())
+                                    if re.search(r"[A-Z]{2}[0-9]{1,2}[A-Z]{1,3}[0-9]{1,4}", raw_text) or re.search(r"[0-9]{2}BH[0-9]{4}[A-Z]{1,2}", raw_text):
+                                        match = re.search(r"([A-Z]{2}[0-9]{1,2}[A-Z]{1,3}[0-9]{1,4}|[0-9]{2}BH[0-9]{4}[A-Z]{1,2})", raw_text)
+                                        if match:
+                                            plate_text = match.group(1)
+                                    elif len(raw_text) >= 4:
+                                        plate_text = raw_text
+                                except Exception:
+                                    pass
+
+                            # Secondary OCR Fallback: Tesseract
+                            if not plate_text and pytesseract is not None and self.ocr_status == "tesseract_loaded":
+                                try:
+                                    gray = cv2.cvtColor(enlarged, cv2.COLOR_BGR2GRAY)
+                                    thresholded = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
+                                    reading = pytesseract.image_to_string(thresholded, config="--psm 7 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+                                    raw_text = re.sub(r"[^A-Z0-9]", "", reading.upper())
+                                    valid_shape = re.fullmatch(r"[A-Z]{2}[0-9]{1,2}[A-Z]{1,3}[0-9]{1,4}", raw_text or "")
+                                    if valid_shape:
+                                        plate_text = raw_text
+                                except Exception:
+                                    pass
                     except Exception:
-                        detection["plate_text"] = None
+                        plate_text = None
+                detection["plate_text"] = plate_text
                 detections.append(detection)
         return detections
 
